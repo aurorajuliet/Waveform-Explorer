@@ -1,0 +1,437 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Waveform Explorer: Frequency, Period, RMS, and Phase</title>
+<style>
+  :root {
+    --surface-1: #f4f3ef;
+    --surface-2: #ffffff;
+    --text-primary: #1a1a1a;
+    --text-secondary: #5b5a56;
+    --border: #d8d6cf;
+    --border-accent: #378add;
+    --bg-accent: #e6f1fb;
+    --text-accent: #0c447c;
+    --radius: 8px;
+  }
+  * { box-sizing: border-box; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif;
+    color: var(--text-primary);
+    background: var(--surface-1);
+    margin: 0;
+    padding: 24px;
+  }
+  .wrap {
+    max-width: 720px;
+    margin: 0 auto;
+    background: var(--surface-2);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 24px;
+  }
+  h1 {
+    font-size: 20px;
+    font-weight: 600;
+    margin: 0 0 4px;
+  }
+  p.subtitle {
+    font-size: 14px;
+    color: var(--text-secondary);
+    margin: 0 0 20px;
+  }
+  .sr-only {
+    position: absolute;
+    width: 1px; height: 1px;
+    overflow: hidden;
+    clip: rect(0,0,0,0);
+  }
+  .tabs {
+    display: flex;
+    gap: 12px;
+    margin-bottom: 1rem;
+  }
+  .tabs button {
+    flex: 1;
+    padding: 10px;
+    font-size: 14px;
+    font-weight: 500;
+    border-radius: var(--radius);
+    border: 1px solid var(--border);
+    background: var(--surface-2);
+    color: var(--text-primary);
+    cursor: pointer;
+  }
+  .tabs button.active {
+    border: 2px solid var(--border-accent);
+    background: var(--bg-accent);
+    color: var(--text-accent);
+    padding: 9px;
+  }
+  .control { margin-bottom: 12px; }
+  .control-label {
+    display: flex;
+    justify-content: space-between;
+    font-size: 14px;
+    color: var(--text-secondary);
+    margin-bottom: 4px;
+  }
+  .range-hint {
+    display: flex;
+    justify-content: space-between;
+    font-size: 11px;
+    color: var(--text-secondary);
+    margin-top: 2px;
+  }
+  input[type="range"] {
+    width: 100%;
+    accent-color: var(--border-accent);
+  }
+  .chart-holder {
+    position: relative;
+    height: 260px;
+    margin: 1.25rem 0;
+  }
+  .stats {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+    gap: 12px;
+    margin-bottom: 1.25rem;
+  }
+  .stat-card {
+    background: var(--surface-1);
+    border-radius: var(--radius);
+    padding: 1rem;
+  }
+  .stat-card p.label {
+    font-size: 13px;
+    color: var(--text-secondary);
+    margin: 0 0 4px;
+  }
+  .stat-card p.value {
+    font-size: 22px;
+    font-weight: 600;
+    margin: 0;
+  }
+  .hidden { display: none; }
+  .sound-row {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    margin-bottom: 1rem;
+    padding: 12px;
+    background: var(--surface-1);
+    border-radius: var(--radius);
+  }
+  .play-btn {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex-shrink: 0;
+    padding: 10px 16px;
+    font-size: 14px;
+    font-weight: 500;
+    border-radius: var(--radius);
+    border: 1px solid var(--border-accent);
+    background: var(--bg-accent);
+    color: var(--text-accent);
+    cursor: pointer;
+  }
+  .play-btn.playing {
+    background: var(--text-accent);
+    color: #fff;
+    border-color: var(--text-accent);
+  }
+  .sound-note {
+    font-size: 12px;
+    color: var(--text-secondary);
+    margin: 0;
+    line-height: 1.4;
+  }
+  footer {
+    font-size: 12px;
+    color: var(--text-secondary);
+    text-align: center;
+    margin-top: 1rem;
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>Waveform explorer</h1>
+  <p class="subtitle">Adjust frequency, amplitude, and phase to build intuition for sine waves.</p>
+  <h2 class="sr-only">Interactive sine wave explorer: adjust frequency, amplitude, and phase of one or two waves, and read off period, RMS amplitude, and phase relationship.</h2>
+
+  <div class="tabs">
+    <button id="tab-wave1" class="active">Wave 1</button>
+    <button id="tab-compare">Compare two waves</button>
+  </div>
+
+  <div id="controls">
+    <div class="control">
+      <div class="control-label"><label for="freq1">Frequency (f)</label><span id="freq1-out">220.0 Hz</span></div>
+      <input type="range" id="freq1" min="0" max="1000" step="1" value="616" />
+      <div class="range-hint"><span>0.5 Hz</span><span>20,000 Hz</span></div>
+    </div>
+    <div class="control">
+      <div class="control-label"><label for="amp1">Amplitude (A)</label><span id="amp1-out">1.0</span></div>
+      <input type="range" id="amp1" min="0.2" max="3" step="0.1" value="1" />
+    </div>
+    <div class="control hidden" id="phase1-row">
+      <div class="control-label"><label for="phase1">Phase (Wave 2, relative)</label><span id="phase1-out">0 deg</span></div>
+      <input type="range" id="phase1" min="0" max="360" step="15" value="0" />
+    </div>
+    <div class="control hidden" id="freq2-row">
+      <div class="control-label"><label for="freq2">Frequency (Wave 2)</label><span id="freq2-out">220.0 Hz</span></div>
+      <input type="range" id="freq2" min="0" max="1000" step="1" value="616" />
+      <div class="range-hint"><span>0.5 Hz</span><span>20,000 Hz</span></div>
+    </div>
+  </div>
+
+  <div class="sound-row">
+    <button id="playBtn" class="play-btn">
+      <span id="playIcon">&#9658;</span>
+      <span id="playLabel">Play sound</span>
+    </button>
+    <p class="sound-note" id="soundNote">Frequencies now play at their true pitch. Below about 20 Hz you'll hear clicks rather than a tone (that's below the range of human hearing); above about 15,000&ndash;18,000 Hz many speakers and ears struggle to reproduce it. Start at a moderate volume.</p>
+  </div>
+
+  <div class="chart-holder">
+    <canvas id="waveChart" role="img" aria-label="Sine wave plot of magnitude versus time in seconds"></canvas>
+  </div>
+
+  <div class="stats">
+    <div class="stat-card">
+      <p class="label">Period (T)</p>
+      <p class="value" id="period-out">0.500 s</p>
+    </div>
+    <div class="stat-card">
+      <p class="label">RMS amplitude</p>
+      <p class="value" id="rms-out">0.707</p>
+    </div>
+    <div class="stat-card">
+      <p class="label">Phase relationship</p>
+      <p class="value" id="phase-verdict" style="font-size:16px;">Single wave</p>
+    </div>
+  </div>
+
+  <footer>Frequency and period are inversely related (f = 1/T). RMS amplitude = peak amplitude &times; 0.707.</footer>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
+<script>
+(function(){
+  var mode = 'single';
+  var N = 500;
+
+  var FREQ_MIN = 0.5, FREQ_MAX = 20000;
+  var LOG_RANGE = Math.log(FREQ_MAX / FREQ_MIN);
+  function sliderToFreq(v){
+    return FREQ_MIN * Math.exp(LOG_RANGE * (v / 1000));
+  }
+  function freqToSlider(f){
+    return Math.round(1000 * Math.log(f / FREQ_MIN) / LOG_RANGE);
+  }
+  function formatFreq(f){
+    if(f >= 1000) return (f/1000).toFixed(2) + ' kHz';
+    return f.toFixed(1) + ' Hz';
+  }
+  function formatPeriod(T){
+    if(T < 0.001) return (T*1e6).toFixed(1) + ' \u00b5s';
+    if(T < 1) return (T*1000).toFixed(2) + ' ms';
+    return T.toFixed(3) + ' s';
+  }
+
+  function genPoints(freq, amp, phaseDeg, windowSec){
+    var pts = [];
+    var phaseRad = phaseDeg * Math.PI / 180;
+    for(var i=0;i<=N;i++){
+      var t = i/N * windowSec;
+      var y = amp * Math.sin(2*Math.PI*freq*t + phaseRad);
+      pts.push({x: t, y: Math.round(y*1000)/1000});
+    }
+    return pts;
+  }
+
+  var ctx = document.getElementById('waveChart');
+  var chart = new Chart(ctx, {
+    type: 'line',
+    data: { datasets: [
+      { label:'Wave 1', data: [], borderColor:'#2a78d6', backgroundColor:'transparent', borderWidth:2, pointRadius:0, tension:0.3 },
+      { label:'Wave 2', data: [], borderColor:'#e34948', backgroundColor:'transparent', borderWidth:2, borderDash:[6,4], pointRadius:0, tension:0.3, hidden:true }
+    ]},
+    options: {
+      responsive:true, maintainAspectRatio:false,
+      animation:false,
+      scales: {
+        x: { type:'linear', title:{display:true, text:'Time (s)'}, min:0 },
+        y: { title:{display:true, text:'Magnitude'}, min:-3.3, max:3.3 }
+      },
+      plugins: { legend: { display:false } }
+    }
+  });
+
+  var freq1 = document.getElementById('freq1'), amp1 = document.getElementById('amp1');
+  var phase1 = document.getElementById('phase1'), freq2 = document.getElementById('freq2');
+  var freq1Out = document.getElementById('freq1-out'), amp1Out = document.getElementById('amp1-out');
+  var phase1Out = document.getElementById('phase1-out'), freq2Out = document.getElementById('freq2-out');
+  var periodOut = document.getElementById('period-out'), rmsOut = document.getElementById('rms-out');
+  var phaseVerdict = document.getElementById('phase-verdict');
+  var phase1Row = document.getElementById('phase1-row'), freq2Row = document.getElementById('freq2-row');
+
+  var audioCtx = null;
+  var osc1 = null, osc2 = null, gain1 = null, gain2 = null;
+  var isPlaying = false;
+  var playBtn = document.getElementById('playBtn');
+  var playIcon = document.getElementById('playIcon');
+  var playLabel = document.getElementById('playLabel');
+
+  function ensureAudioCtx(){
+    if(!audioCtx){
+      var AC = window.AudioContext || window.webkitAudioContext;
+      audioCtx = new AC();
+    }
+    return audioCtx;
+  }
+
+  function startSound(){
+    var ctx = ensureAudioCtx();
+    if(ctx.state === 'suspended'){ ctx.resume(); }
+
+    var f1 = sliderToFreq(parseFloat(freq1.value)), a1 = parseFloat(amp1.value);
+    var ph = parseFloat(phase1.value), f2 = sliderToFreq(parseFloat(freq2.value));
+    var vol1 = Math.min(a1 / 3, 1) * 0.18;
+
+    osc1 = ctx.createOscillator();
+    gain1 = ctx.createGain();
+    osc1.type = 'sine';
+    osc1.frequency.value = f1;
+    gain1.gain.value = 0;
+    osc1.connect(gain1).connect(ctx.destination);
+    osc1.start();
+    gain1.gain.linearRampToValueAtTime(vol1, ctx.currentTime + 0.05);
+
+    if(mode === 'compare'){
+      osc2 = ctx.createOscillator();
+      gain2 = ctx.createGain();
+      osc2.type = 'sine';
+      osc2.frequency.value = f2;
+      gain2.gain.value = 0;
+      osc2.connect(gain2).connect(ctx.destination);
+      var delaySec = (ph / 360) / f2;
+      osc2.start(ctx.currentTime + delaySec);
+      gain2.gain.setValueAtTime(0, ctx.currentTime);
+      gain2.gain.linearRampToValueAtTime(vol1, ctx.currentTime + delaySec + 0.05);
+    }
+
+    isPlaying = true;
+    playBtn.classList.add('playing');
+    playIcon.innerHTML = '&#9632;';
+    playLabel.textContent = 'Stop sound';
+  }
+
+  function stopSound(){
+    var ctx = audioCtx;
+    if(ctx && gain1){
+      gain1.gain.linearRampToValueAtTime(0, ctx.currentTime + 0.05);
+      osc1.stop(ctx.currentTime + 0.08);
+    }
+    if(ctx && gain2){
+      gain2.gain.linearRampToValueAtTime(0, ctx.currentTime + 0.05);
+      osc2.stop(ctx.currentTime + 0.08);
+    }
+    osc1 = null; osc2 = null; gain1 = null; gain2 = null;
+    isPlaying = false;
+    playBtn.classList.remove('playing');
+    playIcon.innerHTML = '&#9658;';
+    playLabel.textContent = 'Play sound';
+  }
+
+  function updateLiveSound(){
+    if(!isPlaying || !audioCtx) return;
+    var f1 = sliderToFreq(parseFloat(freq1.value)), a1 = parseFloat(amp1.value), f2 = sliderToFreq(parseFloat(freq2.value));
+    var vol1 = Math.min(a1 / 3, 1) * 0.18;
+    if(osc1){ osc1.frequency.setValueAtTime(f1, audioCtx.currentTime); }
+    if(gain1){ gain1.gain.setValueAtTime(vol1, audioCtx.currentTime); }
+    if(osc2){ osc2.frequency.setValueAtTime(f2, audioCtx.currentTime); }
+    if(gain2){ gain2.gain.setValueAtTime(vol1, audioCtx.currentTime); }
+  }
+
+  playBtn.addEventListener('click', function(){
+    if(isPlaying){ stopSound(); } else { startSound(); }
+  });
+
+  function update(){
+    var f1 = sliderToFreq(parseFloat(freq1.value)), a1 = parseFloat(amp1.value);
+    var ph = parseFloat(phase1.value), f2 = sliderToFreq(parseFloat(freq2.value));
+
+    freq1Out.textContent = formatFreq(f1);
+    amp1Out.textContent = a1.toFixed(1);
+    phase1Out.textContent = ph.toFixed(0) + ' deg';
+    freq2Out.textContent = formatFreq(f2);
+
+    var lowestFreq = (mode === 'compare') ? Math.min(f1, f2) : f1;
+    var windowSec = Math.min(5 / lowestFreq, 4);
+
+    chart.data.datasets[0].data = genPoints(f1, a1, 0, windowSec);
+    chart.options.scales.x.max = windowSec;
+    periodOut.textContent = formatPeriod(1/f1);
+    rmsOut.textContent = (a1*0.707).toFixed(3);
+
+    if(mode === 'compare'){
+      chart.data.datasets[1].hidden = false;
+      chart.data.datasets[1].data = genPoints(f2, a1, ph, windowSec);
+      var verdict;
+      if(Math.abs(f1 - f2) > 0.01){
+        var ratio = f2/f1;
+        if(Math.abs(ratio - Math.round(ratio)) < 0.02 && ratio !== 1){
+          verdict = 'Wave 2 freq is ' + Math.round(ratio) + 'x wave 1 (integer multiple)';
+        } else {
+          verdict = 'Different, non-multiple frequencies';
+        }
+      } else if(ph === 0 || ph === 360){
+        verdict = 'In phase (0 deg difference)';
+      } else {
+        verdict = 'Out of phase (' + ph + ' deg difference)';
+      }
+      phaseVerdict.textContent = verdict;
+    } else {
+      chart.data.datasets[1].hidden = true;
+      phaseVerdict.textContent = 'Single wave';
+    }
+    chart.update('none');
+  }
+
+  [freq1, amp1, phase1, freq2].forEach(function(el){
+    el.addEventListener('input', function(){ update(); updateLiveSound(); });
+  });
+
+  var tabWave1 = document.getElementById('tab-wave1'), tabCompare = document.getElementById('tab-compare');
+  function setMode(m){
+    var wasPlaying = isPlaying;
+    if(wasPlaying){ stopSound(); }
+    mode = m;
+    if(m === 'single'){
+      tabWave1.classList.add('active');
+      tabCompare.classList.remove('active');
+      phase1Row.classList.add('hidden');
+      freq2Row.classList.add('hidden');
+    } else {
+      tabCompare.classList.add('active');
+      tabWave1.classList.remove('active');
+      phase1Row.classList.remove('hidden');
+      freq2Row.classList.remove('hidden');
+    }
+    update();
+    if(wasPlaying){ startSound(); }
+  }
+  tabWave1.addEventListener('click', function(){ setMode('single'); });
+  tabCompare.addEventListener('click', function(){ setMode('compare'); });
+
+  update();
+})();
+</script>
+</body>
+</html>
