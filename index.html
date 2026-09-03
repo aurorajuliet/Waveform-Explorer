@@ -188,6 +188,10 @@
       <input type="range" id="freq2" min="0" max="1000" step="1" value="616" />
       <div class="range-hint"><span>0.5 Hz</span><span>20,000 Hz</span></div>
     </div>
+    <div class="control hidden" id="amp2-row">
+      <div class="control-label"><label for="amp2">Amplitude (Wave 2)</label><span id="amp2-out">1.0</span></div>
+      <input type="range" id="amp2" min="0.2" max="3" step="0.1" value="1" />
+    </div>
   </div>
 
   <div class="sound-row">
@@ -208,8 +212,12 @@
       <p class="value" id="period-out">0.500 s</p>
     </div>
     <div class="stat-card">
-      <p class="label">RMS amplitude</p>
+      <p class="label" id="rms-label">RMS amplitude</p>
       <p class="value" id="rms-out">0.707</p>
+    </div>
+    <div class="stat-card hidden" id="rms2-card">
+      <p class="label">RMS amplitude (Wave 2)</p>
+      <p class="value" id="rms2-out">0.707</p>
     </div>
     <div class="stat-card">
       <p class="label">Phase relationship</p>
@@ -275,11 +283,16 @@
 
   var freq1 = document.getElementById('freq1'), amp1 = document.getElementById('amp1');
   var phase1 = document.getElementById('phase1'), freq2 = document.getElementById('freq2');
+  var amp2 = document.getElementById('amp2');
   var freq1Out = document.getElementById('freq1-out'), amp1Out = document.getElementById('amp1-out');
   var phase1Out = document.getElementById('phase1-out'), freq2Out = document.getElementById('freq2-out');
+  var amp2Out = document.getElementById('amp2-out');
   var periodOut = document.getElementById('period-out'), rmsOut = document.getElementById('rms-out');
+  var rmsLabel = document.getElementById('rms-label');
+  var rms2Card = document.getElementById('rms2-card'), rms2Out = document.getElementById('rms2-out');
   var phaseVerdict = document.getElementById('phase-verdict');
   var phase1Row = document.getElementById('phase1-row'), freq2Row = document.getElementById('freq2-row');
+  var amp2Row = document.getElementById('amp2-row');
 
   var audioCtx = null;
   var osc1 = null, osc2 = null, gain1 = null, gain2 = null;
@@ -302,7 +315,9 @@
 
     var f1 = sliderToFreq(parseFloat(freq1.value)), a1 = parseFloat(amp1.value);
     var ph = parseFloat(phase1.value), f2 = sliderToFreq(parseFloat(freq2.value));
+    var a2 = parseFloat(amp2.value);
     var vol1 = Math.min(a1 / 3, 1) * 0.18;
+    var vol2 = Math.min(a2 / 3, 1) * 0.18;
 
     osc1 = ctx.createOscillator();
     gain1 = ctx.createGain();
@@ -323,7 +338,7 @@
       var delaySec = (ph / 360) / f2;
       osc2.start(ctx.currentTime + delaySec);
       gain2.gain.setValueAtTime(0, ctx.currentTime);
-      gain2.gain.linearRampToValueAtTime(vol1, ctx.currentTime + delaySec + 0.05);
+      gain2.gain.linearRampToValueAtTime(vol2, ctx.currentTime + delaySec + 0.05);
     }
 
     isPlaying = true;
@@ -352,11 +367,13 @@
   function updateLiveSound(){
     if(!isPlaying || !audioCtx) return;
     var f1 = sliderToFreq(parseFloat(freq1.value)), a1 = parseFloat(amp1.value), f2 = sliderToFreq(parseFloat(freq2.value));
+    var a2 = parseFloat(amp2.value);
     var vol1 = Math.min(a1 / 3, 1) * 0.18;
+    var vol2 = Math.min(a2 / 3, 1) * 0.18;
     if(osc1){ osc1.frequency.setValueAtTime(f1, audioCtx.currentTime); }
     if(gain1){ gain1.gain.setValueAtTime(vol1, audioCtx.currentTime); }
     if(osc2){ osc2.frequency.setValueAtTime(f2, audioCtx.currentTime); }
-    if(gain2){ gain2.gain.setValueAtTime(vol1, audioCtx.currentTime); }
+    if(gain2){ gain2.gain.setValueAtTime(vol2, audioCtx.currentTime); }
   }
 
   playBtn.addEventListener('click', function(){
@@ -366,11 +383,13 @@
   function update(){
     var f1 = sliderToFreq(parseFloat(freq1.value)), a1 = parseFloat(amp1.value);
     var ph = parseFloat(phase1.value), f2 = sliderToFreq(parseFloat(freq2.value));
+    var a2 = parseFloat(amp2.value);
 
     freq1Out.textContent = formatFreq(f1);
     amp1Out.textContent = a1.toFixed(1);
     phase1Out.textContent = ph.toFixed(0) + ' deg';
     freq2Out.textContent = formatFreq(f2);
+    amp2Out.textContent = a2.toFixed(1);
 
     var lowestFreq = (mode === 'compare') ? Math.min(f1, f2) : f1;
     var windowSec = Math.min(5 / lowestFreq, 4);
@@ -381,8 +400,11 @@
     rmsOut.textContent = (a1*0.707).toFixed(3);
 
     if(mode === 'compare'){
+      rmsLabel.textContent = 'RMS amplitude (Wave 1)';
+      rms2Card.classList.remove('hidden');
+      rms2Out.textContent = (a2*0.707).toFixed(3);
       chart.data.datasets[1].hidden = false;
-      chart.data.datasets[1].data = genPoints(f2, a1, ph, windowSec);
+      chart.data.datasets[1].data = genPoints(f2, a2, ph, windowSec);
       var verdict;
       if(Math.abs(f1 - f2) > 0.01){
         var ratio = f2/f1;
@@ -398,13 +420,15 @@
       }
       phaseVerdict.textContent = verdict;
     } else {
+      rmsLabel.textContent = 'RMS amplitude';
+      rms2Card.classList.add('hidden');
       chart.data.datasets[1].hidden = true;
       phaseVerdict.textContent = 'Single wave';
     }
     chart.update('none');
   }
 
-  [freq1, amp1, phase1, freq2].forEach(function(el){
+  [freq1, amp1, phase1, freq2, amp2].forEach(function(el){
     el.addEventListener('input', function(){ update(); updateLiveSound(); });
   });
 
@@ -418,11 +442,13 @@
       tabCompare.classList.remove('active');
       phase1Row.classList.add('hidden');
       freq2Row.classList.add('hidden');
+      amp2Row.classList.add('hidden');
     } else {
       tabCompare.classList.add('active');
       tabWave1.classList.remove('active');
       phase1Row.classList.remove('hidden');
       freq2Row.classList.remove('hidden');
+      amp2Row.classList.remove('hidden');
     }
     update();
     if(wasPlaying){ startSound(); }
